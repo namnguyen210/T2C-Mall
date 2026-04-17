@@ -700,10 +700,10 @@ async function resetAndReprocess() {
     if (resetResult.status !== 'ok') throw new Error(resetResult.message || 'Reset that bai');
 
     pb.style.width = '20%';
-    pl.textContent = 'Bước 2/3 — Đã xóa xong, đang chờ script chạy (~1 phút)...';
+    pl.textContent = 'Bước 2/3 — Đã xóa xong, đang chờ script khởi động (~15 giây)...';
 
-    // Buoc 2: Doi 70 giay cho trigger khoi dong
-    await new Promise(r => setTimeout(r, 70000));
+    // Buoc 2: Doi 15 giay cho trigger khoi dong
+    await new Promise(r => setTimeout(r, 15000));
 
     pb.style.width = '40%';
     pl.textContent = 'Bước 3/3 — Script đang xử lý file, đang kiểm tra tiến độ...';

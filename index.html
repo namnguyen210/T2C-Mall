@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales Dashboard — GM Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f5f3;--surface:#fff;--surface2:#f0efeb;
+  --border:rgba(0,0,0,0.1);--border2:rgba(0,0,0,0.18);
+  --text:#1a1a18;--text2:#6b6b65;--text3:#9b9b94;
+  --blue:#378ADD;--green:#1D9E75;--amber:#BA7517;--red:#E24B4A;
+  --radius:10px;--radius-sm:6px;
+}
+@media(prefers-color-scheme:dark){
+  :root{--bg:#1a1a18;--surface:#242422;--surface2:#2e2e2b;
+    --border:rgba(255,255,255,0.1);--border2:rgba(255,255,255,0.18);
+    --text:#e8e6de;--text2:#9b9b94;--text3:#6b6b65;}
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+.app{max-width:1400px;margin:0 auto;padding:20px 24px}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.topbar h1{font-size:17px;font-weight:600}
+.topbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.config-panel{background:var(--surface);border:0.5px solid var(--border2);border-radius:var(--radius);padding:20px;margin-bottom:20px}
+.config-panel h2{font-size:14px;font-weight:600;margin-bottom:14px;color:var(--text2)}
+.config-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.config-field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:200px}
+.config-field label{font-size:11px;color:var(--text2);font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.config-field input{padding:8px 12px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:13px;font-family:monospace}
+.config-field input:focus{outline:none;border-color:var(--blue)}
+.hint{font-size:11px;color:var(--text3);margin-top:4px}
+
+/* Filters */
+.filters{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end}
+.filter-group{display:flex;flex-direction:column;gap:6px}
+.filter-group label{font-size:11px;color:var(--text2);font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.filter-group input[type=date]{padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:13px}
+.quick-btns{display:flex;gap:6px}
+.quick-btn{padding:7px 12px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:transparent;color:var(--text2);font-size:12px;cursor:pointer}
+.quick-btn:hover{background:var(--surface2);color:var(--text)}
+.quick-btn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+/* Platform checkboxes */
+.platform-filters{display:flex;gap:8px;flex-wrap:wrap}
+.platform-chip{display:flex;align-items:center;gap:6px;padding:6px 12px;border:0.5px solid var(--border2);border-radius:20px;cursor:pointer;font-size:12px;color:var(--text2);background:transparent;user-select:none;transition:all .15s}
+.platform-chip:hover{border-color:var(--border2);background:var(--surface2)}
+.platform-chip.active{color:#fff;border-color:transparent}
+.platform-chip.t2c.active{background:#378ADD}
+.platform-chip.k2c.active{background:#1D9E75}
+.platform-chip.ttk.active{background:#534AB7}
+.platform-chip .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+
+/* Date range picker */
+.date-range{display:flex;align-items:center;gap:6px;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:0 10px}
+.date-range input[type=date]{border:none;background:transparent;color:var(--text);font-size:13px;padding:7px 0;outline:none;width:130px}
+.date-range span{color:var(--text3);font-size:12px}
+
+/* Buttons */
+.btn{padding:8px 16px;border-radius:var(--radius-sm);font-size:13px;cursor:pointer;border:0.5px solid var(--border2);background:var(--surface);color:var(--text);font-family:inherit;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--surface2)}
+.btn-primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn-primary:hover{opacity:.9}
+.btn-danger{background:var(--red);color:#fff;border-color:var(--red)}
+.btn-danger:hover{opacity:.9}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;background:var(--surface2);border-radius:var(--radius-sm);padding:4px;width:fit-content;margin-bottom:16px}
+.tab{padding:7px 18px;border-radius:5px;font-size:13px;cursor:pointer;border:none;background:transparent;color:var(--text2);font-family:inherit}
+.tab.active{background:var(--surface);color:var(--text);border:0.5px solid var(--border)}
+
+/* Metrics */
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.metric{background:var(--surface2);border-radius:var(--radius-sm);padding:14px 16px}
+.metric .lbl{font-size:11px;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em;font-weight:500}
+.metric .val{font-size:22px;font-weight:600;line-height:1.1}
+.val.green{color:var(--green)}.val.blue{color:var(--blue)}.val.red{color:var(--red)}
+
+/* Cards */
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:14px}
+.card-title{font-size:13px;font-weight:500;color:var(--text2);margin-bottom:16px}
+.chart-wrap{position:relative;width:100%}
+
+/* Table */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 12px;border-bottom:0.5px solid var(--border2);font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{color:var(--text)}
+td{padding:7px 12px;border-bottom:0.5px solid var(--border);white-space:nowrap}
+tr:hover td{background:var(--surface2)}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.badge.high{background:#EAF3DE;color:#27500A}
+.badge.mid{background:#FAEEDA;color:#633806}
+.badge.low,.badge.neg{background:#FCEBEB;color:#791F1F}
+
+/* Summary row */
+.summary-row td{font-weight:600;border-top:1.5px solid var(--border2);border-bottom:none;background:var(--surface2)}
+
+/* Search */
+.search-wrap{position:relative}
+.search-wrap input{padding:7px 10px 7px 32px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:13px;width:200px}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;pointer-events:none}
+
+/* Status */
+.status-bar{font-size:12px;color:var(--text3);padding:8px 0}
+.status-bar.error{color:var(--red)}.status-bar.success{color:var(--green)}
+
+/* Loading */
+.loading{display:flex;align-items:center;gap:8px;color:var(--text2);font-size:13px;padding:32px;justify-content:center}
+.spinner{width:18px;height:18px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Progress bar */
+.progress-wrap{margin-top:10px;display:none}
+.progress-track{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.progress-bar{height:100%;background:var(--blue);border-radius:3px;transition:width .3s;width:0%}
+.progress-label{font-size:11px;color:var(--text2);margin-top:4px}
+
+.page{display:none}.page.active{display:block}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- Top bar -->
+<div class="topbar">
+  <h1>📊 Sales Dashboard — GM Tracker</h1>
+  <div class="topbar-right">
+    <span id="lastRefresh" class="status-bar"></span>
+    <button class="btn btn-danger" id="resetBtn" onclick="resetAndReprocess()">🗑 Xóa & chạy lại</button>
+    <button class="btn btn-primary" id="refreshBtn" onclick="loadData()">↻ Refresh data</button>
+  </div>
+</div>
+
+<!-- Config panel -->
+<div class="config-panel" id="configPanel">
+  <h2>⚙️ Cài đặt kết nối</h2>
+  <div class="config-row">
+    <div class="config-field">
+      <label>Google Sheet ID</label>
+      <input type="text" id="sheetId" placeholder="1BxiMVs0X..." onchange="saveConfig()">
+      <div class="hint">URL: .../spreadsheets/d/<strong>[ID]</strong>/edit</div>
+    </div>
+    <div class="config-field">
+      <label>Google API Key</label>
+      <input type="text" id="apiKey" placeholder="AIzaSy..." onchange="saveConfig()">
+      <div class="hint">Cloud Console → Sheets API → Credentials</div>
+    </div>
+    <div class="config-field">
+      <label>Apps Script Web App URL</label>
+      <input type="text" id="scriptUrl" placeholder="https://script.google.com/macros/s/.../exec" onchange="saveConfig()">
+      <div class="hint">Deploy → Web App → Copy URL (dùng cho nút Xóa & chạy lại)</div>
+    </div>
+    <div class="config-field" style="flex:0">
+      <label>&nbsp;</label>
+      <button class="btn" onclick="toggleConfig()">Thu gọn ▲</button>
+    </div>
+  </div>
+  <!-- Progress bar cho reset -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="progress-label" id="progressLabel">Đang xử lý...</div>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="filters">
+  <!-- Date range: 1 ô chọn từ-đến -->
+  <div class="filter-group">
+    <label>Khoảng thời gian</label>
+    <div class="date-range">
+      <input type="date" id="dateFrom" onchange="applyFilters()">
+      <span>→</span>
+      <input type="date" id="dateTo" onchange="applyFilters()">
+    </div>
+  </div>
+
+  <!-- Quick range -->
+  <div class="filter-group">
+    <label>Nhanh</label>
+    <div class="quick-btns">
+      <button class="quick-btn" onclick="setRange('7',this)">7N</button>
+      <button class="quick-btn active" onclick="setRange('mtd',this)">Tháng này</button>
+      <button class="quick-btn" onclick="setRange('30',this)">30N</button>
+      <button class="quick-btn" onclick="setRange('all',this)">Tất cả</button>
+    </div>
+  </div>
+
+  <!-- Platform chips: multi-select -->
+  <div class="filter-group">
+    <label>Sàn TMĐT</label>
+    <div class="platform-filters">
+      <div class="platform-chip t2c active" onclick="togglePlatform('T2C Mall',this)">
+        <span class="dot"></span> Shopee T2C
+      </div>
+      <div class="platform-chip k2c active" onclick="togglePlatform('K2C Mall',this)">
+        <span class="dot"></span> Shopee K2C
+      </div>
+      <div class="platform-chip ttk active" onclick="togglePlatform('TikTok',this)">
+        <span class="dot"></span> TikTok Shop
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Metrics -->
+<div class="metrics" id="metrics">
+  <div class="metric"><div class="lbl">Doanh thu</div><div class="val blue" id="m-rev">—</div></div>
+  <div class="metric"><div class="lbl">Giá vốn</div><div class="val" id="m-cogs">—</div></div>
+  <div class="metric"><div class="lbl">Lợi nhuận gộp</div><div class="val green" id="m-profit">—</div></div>
+  <div class="metric"><div class="lbl">Gross Margin</div><div class="val green" id="m-gm">—</div></div>
+  <div class="metric"><div class="lbl">Số đơn</div><div class="val" id="m-orders">—</div></div>
+  <div class="metric"><div class="lbl">DT/đơn TB</div><div class="val" id="m-avg">—</div></div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('gm')">Gross Margin theo ngày</button>
+  <button class="tab" onclick="switchTab('sku')">Break down theo SKU</button>
+</div>
+
+<div id="loadingEl" class="loading" style="display:none">
+  <div class="spinner"></div> Đang tải dữ liệu...
+</div>
+
+<!-- Page 1: GM theo ngày -->
+<div id="page-gm" class="page active">
+  <div class="card">
+    <div class="card-title">Gross Margin (%) theo ngày</div>
+    <div class="chart-wrap" style="height:260px"><canvas id="gmChart" role="img" aria-label="GM% theo ngày"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Doanh thu & Giá vốn theo ngày</div>
+    <div class="chart-wrap" style="height:240px"><canvas id="revChart" role="img" aria-label="Doanh thu và giá vốn theo ngày"></canvas></div>
+  </div>
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="card-title" style="margin:0">Chi tiết theo ngày</div>
+      <button class="btn" onclick="exportCSV('day')">↓ Export CSV</button>
+    </div>
+    <div class="tbl-wrap">
+      <table id="dayTable">
+        <thead><tr>
+          <th onclick="sortTable('day','date')">Ngày ↕</th>
+          <th onclick="sortTable('day','platform')">Sàn ↕</th>
+          <th onclick="sortTable('day','revenue')" style="text-align:right">Doanh thu ↕</th>
+          <th onclick="sortTable('day','cogs')" style="text-align:right">Giá vốn ↕</th>
+          <th onclick="sortTable('day','profit')" style="text-align:right">Lợi nhuận ↕</th>
+          <th onclick="sortTable('day','gm')" style="text-align:right">GM% ↕</th>
+          <th onclick="sortTable('day','orders')" style="text-align:right">Đơn ↕</th>
+        </tr></thead>
+        <tbody></tbody>
+        <tfoot id="dayTableFoot"></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Page 2: SKU -->
+<div id="page-sku" class="page">
+  <div class="card">
+    <div class="card-title">Top 20 SKU theo doanh thu</div>
+    <div class="chart-wrap" id="skuChartWrap" style="height:500px">
+      <canvas id="skuChart" role="img" aria-label="Doanh thu theo SKU"></canvas>
+    </div>
+  </div>
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div class="card-title" style="margin:0">Chi tiết theo SKU</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="search-wrap">
+          <span class="search-icon">⌕</span>
+          <input type="text" id="skuSearch" placeholder="Tìm SKU..." oninput="renderSKUTable()">
+        </div>
+        <button class="btn" onclick="exportCSV('sku')">↓ Export CSV</button>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table id="skuTable">
+        <thead><tr>
+          <th onclick="sortTable('sku','sku')">SKU ↕</th>
+          <th onclick="sortTable('sku','product')">Tên sản phẩm ↕</th>
+          <th onclick="sortTable('sku','platform')">Sàn ↕</th>
+          <th onclick="sortTable('sku','qty')" style="text-align:right">SL ↕</th>
+          <th onclick="sortTable('sku','revenue')" style="text-align:right">Doanh thu ↕</th>
+          <th onclick="sortTable('sku','cogs')" style="text-align:right">Giá vốn ↕</th>
+          <th onclick="sortTable('sku','profit')" style="text-align:right">Lợi nhuận ↕</th>
+          <th onclick="sortTable('sku','gm')" style="text-align:right">GM% ↕</th>
+        </tr></thead>
+        <tbody></tbody>
+        <tfoot id="skuTableFoot"></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div>
+<script>
+// ── STATE ─────────────────────────────────────────────────────
+let allData = [], filteredData = [];
+let gmChartInst, revChartInst, skuChartInst;
+let sortState = { day:{key:'date',dir:-1}, sku:{key:'revenue',dir:-1} };
+let activePlatforms = new Set(['T2C Mall','K2C Mall','TikTok']);
+let configVisible = true;
+
+// ── CONFIG ────────────────────────────────────────────────────
+function saveConfig() {
+  localStorage.setItem('gm_sheet_id',   document.getElementById('sheetId').value.trim());
+  localStorage.setItem('gm_api_key',    document.getElementById('apiKey').value.trim());
+  localStorage.setItem('gm_script_url', document.getElementById('scriptUrl').value.trim());
+}
+function loadConfig() {
+  document.getElementById('sheetId').value   = localStorage.getItem('gm_sheet_id')   || '';
+  document.getElementById('apiKey').value    = localStorage.getItem('gm_api_key')    || '';
+  document.getElementById('scriptUrl').value = localStorage.getItem('gm_script_url') || '';
+}
+function toggleConfig() {
+  configVisible = !configVisible;
+  const rows = document.querySelectorAll('#configPanel .config-row, #configPanel .hint:last-of-type');
+  document.querySelector('#configPanel .config-row').style.display = configVisible ? 'flex' : 'none';
+  document.querySelector('#configPanel').querySelector('.btn').textContent = configVisible ? 'Thu gọn ▲' : 'Mở rộng ▼';
+}
+
+// ── PLATFORM FILTER ───────────────────────────────────────────
+function togglePlatform(name, el) {
+  if (activePlatforms.has(name)) {
+    if (activePlatforms.size === 1) return; // luon giu it nhat 1
+    activePlatforms.delete(name);
+    el.classList.remove('active');
+  } else {
+    activePlatforms.add(name);
+    el.classList.add('active');
+  }
+  applyFilters();
+}
+
+// ── LOAD DATA ─────────────────────────────────────────────────
+async function loadData() {
+  const sheetId = document.getElementById('sheetId').value.trim();
+  const apiKey  = document.getElementById('apiKey').value.trim();
+  if (!sheetId || !apiKey) { setStatus('⚠️ Nhập Sheet ID và API Key trước', 'error'); return; }
+
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></div> Đang tải...';
+  document.getElementById('loadingEl').style.display = 'flex';
+
+  try {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/orders?key=${apiKey}`;
+    const res = await fetch(url);
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || `HTTP ${res.status}`); }
+    const json = await res.json();
+    const rows = json.values || [];
+    if (rows.length < 2) throw new Error('Sheet "orders" trống');
+
+    allData = parseSheetData(rows);
+    setDateRange();
+    applyFilters();
+    setStatus(`✅ ${new Date().toLocaleTimeString('vi-VN')} — ${allData.length.toLocaleString()} đơn`, 'success');
+  } catch(e) {
+    setStatus(`❌ ${e.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '↻ Refresh data';
+    document.getElementById('loadingEl').style.display = 'none';
+  }
+}
+
+function parseSheetData(rows) {
+  const hdr = rows[0].map(h => String(h).trim().toLowerCase());
+  const idx = n => hdr.indexOf(n);
+  return rows.slice(1).map(r => ({
+    order_id:  r[idx('order_id')]    || '',
+    order_date: parseDate(r[idx('order_date')] || ''),
+    platform:  r[idx('platform')]   || '',
+    sku:       r[idx('sku')]        || '',
+    product:   r[idx('product_name')] || '',
+    qty:       parseNum(r[idx('qty')]),
+    revenue:   parseNum(r[idx('revenue')]),
+    cogs:      parseNum(r[idx('cogs')]),
+    profit:    parseNum(r[idx('gross_profit')]),
+    gm:        parseNum(r[idx('gm_pct')]),
+    status:    r[idx('status')]     || '',
+  })).filter(r => r.order_date && r.revenue >= 0);
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+function parseNum(v) {
+  if (v === undefined || v === null || v === '') return 0;
+  return parseFloat(String(v).replace(/[^\d.-]/g,'')) || 0;
+}
+function dateStr(d) { return d ? d.toISOString().split('T')[0] : ''; }
+
+// ── FILTERS ───────────────────────────────────────────────────
+function setDateRange() {
+  const dates = allData.map(r=>r.order_date).filter(Boolean).sort((a,b)=>a-b);
+  if (!dates.length) return;
+  document.getElementById('dateFrom').value = dateStr(dates[0]);
+  document.getElementById('dateTo').value   = dateStr(dates[dates.length-1]);
+}
+
+function setRange(t, el) {
+  document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  const dates = allData.map(r=>r.order_date).filter(Boolean).sort((a,b)=>a-b);
+  const last  = dates[dates.length-1] || new Date();
+  if (t === 'all') {
+    document.getElementById('dateFrom').value = dateStr(dates[0]);
+    document.getElementById('dateTo').value   = dateStr(last);
+  } else if (t === 'mtd') {
+    document.getElementById('dateFrom').value = dateStr(new Date(last.getFullYear(), last.getMonth(), 1));
+    document.getElementById('dateTo').value   = dateStr(last);
+  } else {
+    const f = new Date(last); f.setDate(f.getDate() - parseInt(t) + 1);
+    document.getElementById('dateFrom').value = dateStr(f);
+    document.getElementById('dateTo').value   = dateStr(last);
+  }
+  applyFilters();
+}
+
+function applyFilters() {
+  const from = new Date(document.getElementById('dateFrom').value);
+  const to   = new Date(document.getElementById('dateTo').value); to.setHours(23,59,59);
+  filteredData = allData.filter(r =>
+    r.order_date >= from && r.order_date <= to &&
+    activePlatforms.has(r.platform)
+  );
+  renderAll();
+}
+
+// ── RENDER ────────────────────────────────────────────────────
+function renderAll() {
+  renderMetrics();
+  renderGMChart();
+  renderRevChart();
+  renderDayTable();
+  renderSKUChart();
+  renderSKUTable();
+}
+
+const fmtVND = v => new Intl.NumberFormat('vi-VN').format(Math.round(v));
+const fmtPct = v => (v*100).toFixed(2)+'%';
+const gmClass = g => g>=0.4?'high':g>=0.3?'mid':g>=0?'low':'neg';
+
+function renderMetrics() {
+  const rev    = filteredData.reduce((s,r)=>s+r.revenue,0);
+  const cogs   = filteredData.reduce((s,r)=>s+r.cogs,0);
+  const profit = rev - cogs;
+  const gm     = rev>0 ? profit/rev : 0;
+  const n      = filteredData.length;
+  document.getElementById('m-rev').textContent    = fmtVND(rev);
+  document.getElementById('m-cogs').textContent   = fmtVND(cogs);
+  document.getElementById('m-profit').textContent = fmtVND(profit);
+  document.getElementById('m-gm').textContent     = fmtPct(gm);
+  document.getElementById('m-gm').className       = 'val '+(gm>=0.4?'green':gm>=0.3?'':'red');
+  document.getElementById('m-orders').textContent = n.toLocaleString();
+  document.getElementById('m-avg').textContent    = n>0 ? fmtVND(rev/n) : '—';
+}
+
+function groupByDay(data) {
+  const map = {};
+  data.forEach(r => {
+    const k = dateStr(r.order_date);
+    if (!map[k]) map[k] = {date:k, platform:r.platform, revenue:0, cogs:0, profit:0, orders:0};
+    map[k].revenue += r.revenue;
+    map[k].cogs    += r.cogs;
+    map[k].profit  += r.revenue - r.cogs;
+    map[k].orders  ++;
+  });
+  return Object.values(map).sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+function renderGMChart() {
+  const days = groupByDay(filteredData);
+  const isDark = matchMedia('(prefers-color-scheme:dark)').matches;
+  if (gmChartInst) gmChartInst.destroy();
+  gmChartInst = new Chart(document.getElementById('gmChart'), {
+    type:'line',
+    data:{labels:days.map(d=>d.date.slice(5)),datasets:[{
+      label:'GM%', data:days.map(d=>d.revenue>0?+((d.profit/d.revenue)*100).toFixed(2):0),
+      borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.08)',
+      borderWidth:2,pointRadius:days.length>60?0:3,fill:true,tension:0.3
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`GM: ${c.raw}%`}}},
+      scales:{y:{ticks:{callback:v=>v+'%',font:{size:11}},grid:{color:isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)'}},
+              x:{ticks:{font:{size:10},maxRotation:45,autoSkip:true,maxTicksLimit:24},grid:{display:false}}}}
+  });
+}
+
+function renderRevChart() {
+  const days = groupByDay(filteredData);
+  const isDark = matchMedia('(prefers-color-scheme:dark)').matches;
+  if (revChartInst) revChartInst.destroy();
+  revChartInst = new Chart(document.getElementById('revChart'), {
+    type:'bar',
+    data:{labels:days.map(d=>d.date.slice(5)),datasets:[
+      {label:'Doanh thu',data:days.map(d=>d.revenue),backgroundColor:'rgba(55,138,221,0.75)',borderWidth:0},
+      {label:'Giá vốn',  data:days.map(d=>d.cogs),   backgroundColor:'rgba(150,150,140,0.45)',borderWidth:0}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:true,position:'top',labels:{font:{size:11},boxWidth:10,padding:12}}},
+      scales:{y:{ticks:{callback:v=>{if(v>=1e9)return(v/1e9).toFixed(1)+'B';if(v>=1e6)return(v/1e6).toFixed(0)+'M';if(v>=1e3)return(v/1e3).toFixed(0)+'K';return v;},font:{size:10}},grid:{color:isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)'}},
+              x:{ticks:{font:{size:10},maxRotation:45,autoSkip:true,maxTicksLimit:24},grid:{display:false}}}}
+  });
+}
+
+function renderDayTable() {
+  const days = groupByDay(filteredData);
+  const {key,dir} = sortState.day;
+  days.sort((a,b) => {
+    const av=a[key],bv=b[key];
+    return dir*(typeof av==='string'?av.localeCompare(bv):bv-av);
+  });
+  const tbody = document.querySelector('#dayTable tbody');
+  tbody.innerHTML = days.map(d => {
+    const gm = d.revenue>0 ? d.profit/d.revenue : 0;
+    return `<tr>
+      <td>${d.date}</td>
+      <td><span style="font-size:11px;color:var(--text2)">${d.platform||'—'}</span></td>
+      <td class="num">${fmtVND(d.revenue)}</td>
+      <td class="num">${fmtVND(d.cogs)}</td>
+      <td class="num">${fmtVND(d.profit)}</td>
+      <td class="num"><span class="badge ${gmClass(gm)}">${fmtPct(gm)}</span></td>
+      <td class="num">${d.orders.toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+
+  // Summary row
+  const totRev    = days.reduce((s,d)=>s+d.revenue,0);
+  const totCogs   = days.reduce((s,d)=>s+d.cogs,0);
+  const totProfit = days.reduce((s,d)=>s+d.profit,0);
+  const totGM     = totRev>0 ? totProfit/totRev : 0;
+  const totOrders = days.reduce((s,d)=>s+d.orders,0);
+  document.getElementById('dayTableFoot').innerHTML = `
+    <tr class="summary-row">
+      <td><strong>Tổng cộng</strong></td>
+      <td></td>
+      <td class="num"><strong>${fmtVND(totRev)}</strong></td>
+      <td class="num"><strong>${fmtVND(totCogs)}</strong></td>
+      <td class="num"><strong>${fmtVND(totProfit)}</strong></td>
+      <td class="num"><span class="badge ${gmClass(totGM)}">${fmtPct(totGM)}</span></td>
+      <td class="num"><strong>${totOrders.toLocaleString()}</strong></td>
+    </tr>`;
+}
+
+function groupBySKU(data) {
+  const map = {};
+  data.forEach(r => {
+    if (!map[r.sku]) map[r.sku] = {sku:r.sku,product:r.product,platform:r.platform,qty:0,revenue:0,cogs:0,profit:0};
+    map[r.sku].qty     += r.qty;
+    map[r.sku].revenue += r.revenue;
+    map[r.sku].cogs    += r.cogs;
+    map[r.sku].profit  += r.revenue - r.cogs;
+  });
+  return Object.values(map).map(s=>({...s, gm:s.revenue>0?s.profit/s.revenue:0}));
+}
+
+function renderSKUChart() {
+  const skus = groupBySKU(filteredData).sort((a,b)=>b.revenue-a.revenue).slice(0,20);
+  if (skuChartInst) skuChartInst.destroy();
+  skuChartInst = new Chart(document.getElementById('skuChart'), {
+    type:'bar',
+    data:{labels:skus.map(s=>s.sku),datasets:[
+      {label:'Doanh thu',data:skus.map(s=>s.revenue),backgroundColor:'rgba(55,138,221,0.75)',borderWidth:0},
+      {label:'Giá vốn',  data:skus.map(s=>s.cogs),   backgroundColor:'rgba(150,150,140,0.45)',borderWidth:0}
+    ]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:true,position:'top',labels:{font:{size:11},boxWidth:10}}},
+      scales:{x:{ticks:{callback:v=>{if(v>=1e6)return(v/1e6).toFixed(0)+'M';if(v>=1e3)return(v/1e3).toFixed(0)+'K';return v;},font:{size:10}},grid:{color:'rgba(128,128,128,0.1)'}},
+              y:{ticks:{font:{size:11}},grid:{display:false}}}}
+  });
+  document.getElementById('skuChartWrap').style.height = Math.max(300, skus.length*28+80)+'px';
+}
+
+function renderSKUTable() {
+  let skus = groupBySKU(filteredData);
+  const q = (document.getElementById('skuSearch').value||'').toLowerCase();
+  if (q) skus = skus.filter(s=>s.sku.toLowerCase().includes(q)||s.product.toLowerCase().includes(q));
+  const {key,dir} = sortState.sku;
+  skus.sort((a,b)=>{const av=a[key],bv=b[key];return dir*(typeof av==='string'?av.localeCompare(bv):bv-av);});
+
+  const tbody = document.querySelector('#skuTable tbody');
+  tbody.innerHTML = skus.map(s=>`<tr>
+    <td style="font-weight:500">${s.sku}</td>
+    <td style="color:var(--text2);max-width:200px;overflow:hidden;text-overflow:ellipsis">${s.product}</td>
+    <td><span style="font-size:11px;color:var(--text2)">${s.platform}</span></td>
+    <td class="num">${fmtVND(s.qty)}</td>
+    <td class="num">${fmtVND(s.revenue)}</td>
+    <td class="num">${fmtVND(s.cogs)}</td>
+    <td class="num">${fmtVND(s.profit)}</td>
+    <td class="num"><span class="badge ${gmClass(s.gm)}">${fmtPct(s.gm)}</span></td>
+  </tr>`).join('');
+
+  // Summary row SKU
+  const totRev    = skus.reduce((s,r)=>s+r.revenue,0);
+  const totCogs   = skus.reduce((s,r)=>s+r.cogs,0);
+  const totProfit = skus.reduce((s,r)=>s+r.profit,0);
+  const totGM     = totRev>0 ? totProfit/totRev : 0;
+  const totQty    = skus.reduce((s,r)=>s+r.qty,0);
+  document.getElementById('skuTableFoot').innerHTML = `
+    <tr class="summary-row">
+      <td><strong>Tổng cộng</strong></td><td></td><td></td>
+      <td class="num"><strong>${fmtVND(totQty)}</strong></td>
+      <td class="num"><strong>${fmtVND(totRev)}</strong></td>
+      <td class="num"><strong>${fmtVND(totCogs)}</strong></td>
+      <td class="num"><strong>${fmtVND(totProfit)}</strong></td>
+      <td class="num"><span class="badge ${gmClass(totGM)}">${fmtPct(totGM)}</span></td>
+    </tr>`;
+}
+
+// ── SORT ──────────────────────────────────────────────────────
+function sortTable(tbl, key) {
+  if (sortState[tbl].key===key) sortState[tbl].dir*=-1;
+  else { sortState[tbl].key=key; sortState[tbl].dir=-1; }
+  if (tbl==='day') renderDayTable(); else renderSKUTable();
+}
+
+// ── EXPORT CSV ────────────────────────────────────────────────
+function exportCSV(type) {
+  let headers, rows;
+  if (type==='day') {
+    headers=['Ngày','Sàn','Doanh thu','Giá vốn','Lợi nhuận','GM%','Số đơn'];
+    rows=groupByDay(filteredData).map(d=>{
+      const gm=d.revenue>0?d.profit/d.revenue:0;
+      return [d.date,d.platform,d.revenue,d.cogs,d.profit,(gm*100).toFixed(2)+'%',d.orders];
+    });
+  } else {
+    headers=['SKU','Tên sản phẩm','Sàn','Số lượng','Doanh thu','Giá vốn','Lợi nhuận','GM%'];
+    rows=groupBySKU(filteredData).sort((a,b)=>b.revenue-a.revenue).map(s=>
+      [s.sku,s.product,s.platform,s.qty,s.revenue,s.cogs,s.profit,(s.gm*100).toFixed(2)+'%']
+    );
+  }
+  const csv=[headers,...rows].map(r=>r.map(c=>`"${c}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`sales_${type}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ── RESET & REPROCESS ─────────────────────────────────────────
+async function resetAndReprocess() {
+  const scriptUrl = document.getElementById('scriptUrl').value.trim();
+  if (!scriptUrl) {
+    alert('Vui lòng nhập Apps Script Web App URL trong phần cài đặt trước.\n\nHướng dẫn:\n1. Apps Script → Deploy → New Deployment\n2. Type: Web App\n3. Execute as: Me\n4. Who has access: Anyone\n5. Deploy → Copy URL → Paste vào ô Apps Script Web App URL');
+    return;
+  }
+  if (!confirm('Xóa toàn bộ dữ liệu trong sheet "orders" và chạy lại script?\n\nThao tác này không thể hoàn tác.')) return;
+
+  const btn = document.getElementById('resetBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block;vertical-align:middle;margin-right:6px"></div> Đang xử lý...';
+
+  const pw = document.getElementById('progressWrap');
+  const pb = document.getElementById('progressBar');
+  const pl = document.getElementById('progressLabel');
+  pw.style.display = 'block';
+  pb.style.width = '5%';
+  pl.textContent = 'Đang gửi lệnh đến Apps Script...';
+
+  try {
+    // Goi Apps Script Web App
+    const url = scriptUrl + '?action=resetAndProcess';
+    pl.textContent = 'Đang xóa dữ liệu cũ...';
+    pb.style.width = '15%';
+
+    const res = await fetch(url, {method:'GET', mode:'no-cors'});
+    // no-cors nen khong doc duoc response — poll sheet de biet tien do
+    pb.style.width = '30%';
+    pl.textContent = 'Script đang chạy — đang kiểm tra tiến độ...';
+
+    // Poll sheet moi 5 giay de xem co data moi chua
+    let attempts = 0;
+    const maxAttempts = 36; // toi da 3 phut
+    const poll = setInterval(async () => {
+      attempts++;
+      const pct = Math.min(30 + attempts * 2, 90);
+      pb.style.width = pct + '%';
+      pl.textContent = `Script đang chạy... (${attempts * 5}s)`;
+
+      try {
+        const sheetId = document.getElementById('sheetId').value.trim();
+        const apiKey  = document.getElementById('apiKey').value.trim();
+        const checkUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/orders?key=${apiKey}`;
+        const checkRes = await fetch(checkUrl);
+        const checkJson = await checkRes.json();
+        const rowCount = (checkJson.values || []).length;
+
+        if (rowCount > 1) {
+          clearInterval(poll);
+          pb.style.width = '100%';
+          pl.textContent = `✅ Hoàn thành! ${(rowCount-1).toLocaleString()} đơn hàng đã được xử lý.`;
+          setTimeout(() => { pw.style.display='none'; pb.style.width='0%'; }, 3000);
+          await loadData();
+        } else if (attempts >= maxAttempts) {
+          clearInterval(poll);
+          pl.textContent = '⚠️ Quá thời gian chờ. Nhấn Refresh data để kiểm tra.';
+          pb.style.width = '0%';
+        }
+      } catch(e) { /* bo qua loi poll */ }
+    }, 5000);
+
+  } catch(e) {
+    pl.textContent = '❌ Lỗi: ' + e.message;
+    pb.style.width = '0%';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🗑 Xóa & chạy lại';
+  }
+}
+
+// ── UI HELPERS ────────────────────────────────────────────────
+function switchTab(t) {
+  document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active',(i===0&&t==='gm')||(i===1&&t==='sku')));
+  document.getElementById('page-gm').classList.toggle('active',t==='gm');
+  document.getElementById('page-sku').classList.toggle('active',t==='sku');
+}
+function setStatus(msg, type='') {
+  const el = document.getElementById('lastRefresh');
+  el.textContent = msg;
+  el.className = 'status-bar ' + type;
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+loadConfig();
+setStatus('Nhập cấu hình và nhấn Refresh để tải dữ liệu');
+</script>
+</body>
+</html>

@@ -650,10 +650,10 @@ function exportCSV(type) {
 async function resetAndReprocess() {
   const scriptUrl = document.getElementById('scriptUrl').value.trim();
   if (!scriptUrl) {
-    alert('Vui lòng nhập Apps Script Web App URL trong phần cài đặt trước.\n\nHướng dẫn:\n1. Apps Script → Deploy → New Deployment\n2. Type: Web App\n3. Execute as: Me\n4. Who has access: Anyone\n5. Deploy → Copy URL → Paste vào ô Apps Script Web App URL');
+    alert('Vui lòng nhập Apps Script Web App URL trong phần cài đặt.\n\nHướng dẫn:\n1. Apps Script → Deploy → New Deployment\n2. Type: Web App | Execute as: Me | Who has access: Anyone\n3. Deploy → Copy URL → Paste vào ô Apps Script Web App URL');
     return;
   }
-  if (!confirm('Xóa toàn bộ dữ liệu trong sheet "orders" và chạy lại script?\n\nThao tác này không thể hoàn tác.')) return;
+  if (!confirm('Xóa toàn bộ dữ liệu và chạy lại script xử lý file?\n\nThao tác này không thể hoàn tác.')) return;
 
   const btn = document.getElementById('resetBtn');
   btn.disabled = true;
@@ -664,49 +664,71 @@ async function resetAndReprocess() {
   const pl = document.getElementById('progressLabel');
   pw.style.display = 'block';
   pb.style.width = '5%';
-  pl.textContent = 'Đang gửi lệnh đến Apps Script...';
+  pl.textContent = 'Bước 1/3 — Đang xóa dữ liệu cũ...';
 
   try {
-    // Goi Apps Script Web App
-    const url = scriptUrl + '?action=resetAndProcess';
-    pl.textContent = 'Đang xóa dữ liệu cũ...';
-    pb.style.width = '15%';
+    // Buoc 1: Goi reset (xoa data + dat trigger chay sau 1 phut)
+    const resetUrl = scriptUrl + '?action=reset';
+    await fetch(resetUrl, {mode:'no-cors'});
 
-    const res = await fetch(url, {method:'GET', mode:'no-cors'});
-    // no-cors nen khong doc duoc response — poll sheet de biet tien do
-    pb.style.width = '30%';
-    pl.textContent = 'Script đang chạy — đang kiểm tra tiến độ...';
+    pb.style.width = '20%';
+    pl.textContent = 'Bước 2/3 — Đã xóa xong, đang chờ script chạy (~1 phút)...';
 
-    // Poll sheet moi 5 giay de xem co data moi chua
-    let attempts = 0;
-    const maxAttempts = 36; // toi da 3 phut
+    // Buoc 2: Doi 70 giay cho trigger khoi dong
+    await new Promise(r => setTimeout(r, 70000));
+
+    pb.style.width = '40%';
+    pl.textContent = 'Bước 3/3 — Script đang xử lý file, đang kiểm tra tiến độ...';
+
+    // Buoc 3: Poll status qua ?action=status moi 8 giay
+    const sheetId  = document.getElementById('sheetId').value.trim();
+    const apiKey   = document.getElementById('apiKey').value.trim();
+    let lastCount  = 0;
+    let stableRounds = 0;
+    let attempts   = 0;
+    const maxAttempts = 40; // toi da ~5 phut
+
     const poll = setInterval(async () => {
       attempts++;
-      const pct = Math.min(30 + attempts * 2, 90);
-      pb.style.width = pct + '%';
-      pl.textContent = `Script đang chạy... (${attempts * 5}s)`;
-
       try {
-        const sheetId = document.getElementById('sheetId').value.trim();
-        const apiKey  = document.getElementById('apiKey').value.trim();
+        // Poll truc tiep Sheets API de dem so don
         const checkUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/orders?key=${apiKey}`;
-        const checkRes = await fetch(checkUrl);
-        const checkJson = await checkRes.json();
-        const rowCount = (checkJson.values || []).length;
+        const res  = await fetch(checkUrl);
+        const json = await res.json();
+        const count = Math.max(0, (json.values||[]).length - 1);
 
-        if (rowCount > 1) {
+        const pct = Math.min(40 + attempts * 1.5, 95);
+        pb.style.width = pct + '%';
+        pl.textContent = `Script đang chạy — ${count.toLocaleString()} đơn đã xử lý...`;
+
+        // Neu so don khong doi qua 2 lan poll lien tiep va > 0 => xong
+        if (count > 0 && count === lastCount) {
+          stableRounds++;
+          if (stableRounds >= 2) {
+            clearInterval(poll);
+            pb.style.width = '100%';
+            pl.textContent = `✅ Hoàn thành! ${count.toLocaleString()} đơn hàng đã được xử lý.`;
+            setTimeout(() => { pw.style.display='none'; pb.style.width='0%'; }, 4000);
+            await loadData();
+          }
+        } else {
+          stableRounds = 0;
+          lastCount = count;
+        }
+
+        if (attempts >= maxAttempts) {
           clearInterval(poll);
-          pb.style.width = '100%';
-          pl.textContent = `✅ Hoàn thành! ${(rowCount-1).toLocaleString()} đơn hàng đã được xử lý.`;
-          setTimeout(() => { pw.style.display='none'; pb.style.width='0%'; }, 3000);
-          await loadData();
-        } else if (attempts >= maxAttempts) {
-          clearInterval(poll);
-          pl.textContent = '⚠️ Quá thời gian chờ. Nhấn Refresh data để kiểm tra.';
+          if (count > 0) {
+            pb.style.width = '100%';
+            pl.textContent = `✅ ${count.toLocaleString()} đơn — nhấn Refresh data để cập nhật.`;
+            await loadData();
+          } else {
+            pl.textContent = '⚠️ Script vẫn đang chạy. Nhấn Refresh data sau vài phút.';
+          }
           pb.style.width = '0%';
         }
-      } catch(e) { /* bo qua loi poll */ }
-    }, 5000);
+      } catch(err) { /* bo qua loi poll tam thoi */ }
+    }, 8000);
 
   } catch(e) {
     pl.textContent = '❌ Lỗi: ' + e.message;
